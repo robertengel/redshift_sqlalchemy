@@ -195,6 +195,7 @@ class UnloadFromSelect(Executable, ClauseElement):
                     'OFF' the result will write to one (1) file up to 6.2GB before
                     splitting
                 add_quotes: Boolean value for ADDQUOTES; defaults to True
+                null_as: optional string that represents a null value in unload output
                 delimiter - File delimiter. Defaults to ','
         '''
         self.select = select
@@ -215,6 +216,7 @@ def visit_unload_from_select(element, compiler, **kw):
            CREDENTIALS 'aws_access_key_id=%(access_key)s;aws_secret_access_key=%(secret_key)s%(session_token)s'
            DELIMITER '%(delimiter)s'
            %(add_quotes)s
+           %(null_as)s
            ALLOWOVERWRITE
            PARALLEL %(parallel)s;
            """ % \
@@ -224,6 +226,7 @@ def visit_unload_from_select(element, compiler, **kw):
             'secret_key': element.secret_key,
             'session_token': ';token=%s' % element.session_token if element.session_token else '',
             'add_quotes': 'ADDQUOTES' if bool(element.options.get('add_quotes', True)) else '',
+            'null_as': ("NULL '%s'" % element.options.get('null_as')) if element.options.get('null_as') else '',
             'delimiter': element.options.get('delimiter', ','),
             'parallel': element.options.get('parallel', 'ON')}
 
@@ -238,14 +241,15 @@ class CopyCommand(Executable, ClauseElement):
             self: An instance of CopyCommand
             schema_name - Schema associated with the table_name
             table_name: The table to copy the data into
-            data_location The Amazon S3 location from where to copy
+            data_location The Amazon S3 location from where to copy - or a manifest file if 'manifest' option is used
             access_key - AWS Access Key (required)
             secret_key - AWS Secret Key (required)
             session_token - AWS STS Session Token (optional)
             options - Set of optional parameters to modify the COPY sql
                 delimiter - File delimiter; defaults to ','
                 ignore_header - Integer value of number of lines to skip at the start of each file
-                null - String value denoting what to interpret as a NULL value from the file; defaults to '---'
+                null - Optional string value denoting what to interpret as a NULL value from the file
+                manifest - Boolean value denoting whether data_location is a manifest file; defaults to False
                 empty_as_null - Boolean value denoting whether to load VARCHAR fields with
                                 empty values as NULL instead of empty string; defaults to True
                 blanks_as_null - Boolean value denoting whether to load VARCHAR fields with
@@ -271,7 +275,8 @@ def visit_copy_command(element, compiler, **kw):
            TRUNCATECOLUMNS
            DELIMITER '%(delimiter)s'
            IGNOREHEADER %(ignore_header)s
-           NULL '%(null)s'
+           %(null)s
+           %(manifest)s
            %(empty_as_null)s
            %(blanks_as_null)s;
            """ % \
@@ -281,9 +286,10 @@ def visit_copy_command(element, compiler, **kw):
             'access_key': element.access_key,
             'secret_key': element.secret_key,
             'session_token': ';token=%s' % element.session_token if element.session_token else '',
-            'null': element.options.get('null', '---'),
+            'null': ("NULL '%s'" % element.options.get('null')) if element.options.get('null') else '',
             'delimiter': element.options.get('delimiter', ','),
             'ignore_header': element.options.get('ignore_header', 0),
+            'manifest': 'MANIFEST' if bool(element.options.get('manifest', False)) else '',
             'empty_as_null': 'EMPTYASNULL' if bool(element.options.get('empty_as_null', True)) else '',
             'blanks_as_null': 'BLANKSASNULL' if bool(element.options.get('blanks_as_null', True)) else ''}
 
