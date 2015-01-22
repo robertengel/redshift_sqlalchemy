@@ -197,6 +197,8 @@ class UnloadFromSelect(Executable, ClauseElement):
                 parallel: If 'ON' the result will be written to multiple files. If
                     'OFF' the result will write to one (1) file up to 6.2GB before
                     splitting
+                gzip - Boolean value denoting whether output should be gzipped (.gz)
+                escape - Boolean value denoting whether special characters should be escaped; defaults to False
                 add_quotes: Boolean value for ADDQUOTES; defaults to True
                 null_as: optional string that represents a null value in unload output
                 delimiter - File delimiter. Defaults to ','
@@ -220,6 +222,8 @@ def visit_unload_from_select(element, compiler, **kw):
            DELIMITER '%(delimiter)s'
            %(add_quotes)s
            %(null_as)s
+           %(gzip)s
+           %(escape)s
            ALLOWOVERWRITE
            PARALLEL %(parallel)s;
            """ % \
@@ -228,6 +232,8 @@ def visit_unload_from_select(element, compiler, **kw):
             'access_key': element.access_key,
             'secret_key': element.secret_key,
             'session_token': ';token=%s' % element.session_token if element.session_token else '',
+            'gzip': 'GZIP' if bool(element.options.get('gzip', False)) else '',
+            'escape': 'ESCAPE' if bool(element.options.get('escape', False)) else '',
             'add_quotes': 'ADDQUOTES' if bool(element.options.get('add_quotes', True)) else '',
             'null_as': ("NULL '%s'" % element.options.get('null_as')) if element.options.get('null_as') else '',
             'delimiter': element.options.get('delimiter', ','),
@@ -252,6 +258,9 @@ class CopyCommand(Executable, ClauseElement):
                 delimiter - File delimiter; defaults to ','
                 ignore_header - Integer value of number of lines to skip at the start of each file
                 null - Optional string value denoting what to interpret as a NULL value from the file
+                gzip - Boolean value denoting whether input data is gzipped (.gz); defaults to False
+                escape - Boolean value denoting whether the backslash is treated as escape character; defaults to False
+                remove_quotes - Boolean value denoting whether to remove surrounding quotation; defaults to False
                 manifest - Boolean value denoting whether data_location is a manifest file; defaults to False
                 empty_as_null - Boolean value denoting whether to load VARCHAR fields with
                                 empty values as NULL instead of empty string; defaults to True
@@ -279,6 +288,9 @@ def visit_copy_command(element, compiler, **kw):
            DELIMITER '%(delimiter)s'
            IGNOREHEADER %(ignore_header)s
            %(null)s
+           %(gzip)s
+           %(escape)s
+           %(remove_quotes)s
            %(manifest)s
            %(empty_as_null)s
            %(blanks_as_null)s;
@@ -292,6 +304,9 @@ def visit_copy_command(element, compiler, **kw):
             'null': ("NULL '%s'" % element.options.get('null')) if element.options.get('null') else '',
             'delimiter': element.options.get('delimiter', ','),
             'ignore_header': element.options.get('ignore_header', 0),
+            'gzip': 'GZIP' if bool(element.options.get('gzip', False)) else '',
+            'escape': 'ESCAPE' if bool(element.options.get('escape', False)) else '',
+            'remove_quotes': 'REMOVEQUOTES' if bool(element.options.get('remove_quotes', False)) else '',
             'manifest': 'MANIFEST' if bool(element.options.get('manifest', False)) else '',
             'empty_as_null': 'EMPTYASNULL' if bool(element.options.get('empty_as_null', True)) else '',
             'blanks_as_null': 'BLANKSASNULL' if bool(element.options.get('blanks_as_null', True)) else ''}
