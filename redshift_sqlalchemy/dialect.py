@@ -248,24 +248,27 @@ class CopyCommand(Executable, ClauseElement):
 
         Args:
             self: An instance of CopyCommand
-            schema_name - Schema associated with the table_name
-            table_name: The table to copy the data into
-            data_location The Amazon S3 location from where to copy - or a manifest file if 'manifest' option is used
-            access_key - AWS Access Key (required)
-            secret_key - AWS Secret Key (required)
+            schema_name   - Schema associated with the table_name
+            table_name    - The table to copy the data into
+            data_location - The Amazon S3 location or DynamoDB location from where to copy
+                            or a manifest file if 'manifest' option is used
+            access_key    - AWS Access Key (required)
+            secret_key    - AWS Secret Key (required)
             session_token - AWS STS Session Token (optional)
-            options - Set of optional parameters to modify the COPY sql
-                delimiter - File delimiter; defaults to ','
-                ignore_header - Integer value of number of lines to skip at the start of each file
-                null - Optional string value denoting what to interpret as a NULL value from the file
-                gzip - Boolean value denoting whether input data is gzipped (.gz); defaults to False
-                escape - Boolean value denoting whether the backslash is treated as escape character; defaults to False
-                remove_quotes - Boolean value denoting whether to remove surrounding quotation; defaults to False
-                manifest - Boolean value denoting whether data_location is a manifest file; defaults to False
-                empty_as_null - Boolean value denoting whether to load VARCHAR fields with
-                                empty values as NULL instead of empty string; defaults to True
-                blanks_as_null - Boolean value denoting whether to load VARCHAR fields with
-                                 whitespace only values as NULL instead of whitespace; defaults to True
+            options       - Set of optional parameters to modify the COPY sql
+                truncate_columns - Boolean value denoting whether to truncate columns (vs. fail) on overflow; defaults to True
+                delimiter        - File delimiter; defaults to ','
+                ignore_header    - Integer value of number of lines to skip at the start of each file
+                null             - Optional string value denoting what to interpret as a NULL value from the file
+                gzip             - Boolean value denoting whether input data is gzipped (.gz); defaults to False
+                escape           - Boolean value denoting whether the backslash is treated as escape character; defaults to False
+                remove_quotes    - Boolean value denoting whether to remove surrounding quotation; defaults to False
+                manifest         - Boolean value denoting whether data_location is a manifest file; defaults to False
+                empty_as_null    - Boolean value denoting whether to load VARCHAR fields with
+                                   empty values as NULL instead of empty string; defaults to True
+                blanks_as_null   - Boolean value denoting whether to load VARCHAR fields with
+                                   whitespace only values as NULL instead of whitespace; defaults to True
+                readratio        - (only for copying from DynamoDB) specifies readratio 0..200, defaults to 175 (= 80%)
         '''
         self.schema_name = schema_name
         self.table_name = table_name
@@ -280,20 +283,40 @@ class CopyCommand(Executable, ClauseElement):
 def visit_copy_command(element, compiler, **kw):
     ''' Returns the actual sql query for the CopyCommand class
     '''
+
+    if element.data_location.startswith('dynamodb://'):
+        datasource_options = \
+            """
+                READRATIO %(readratio)s
+            """ % \
+            {'readratio':  element.options.get('readratio', 175)}
+    else:
+        datasource_options = \
+            """
+                CSV
+                DELIMITER '%(delimiter)s'
+                IGNOREHEADER %(ignore_header)s
+                %(null)s
+                %(gzip)s
+                %(escape)s
+                %(remove_quotes)s
+            """ % \
+            {'delimiter': element.options.get('delimiter', ','),
+             'ignore_header': element.options.get('ignore_header', 0),
+             'manifest': 'MANIFEST' if bool(element.options.get('manifest', False)) else '',
+             'null': ("NULL '%s'" % element.options.get('null')) if element.options.get('null') else '',
+             'gzip': 'GZIP' if bool(element.options.get('gzip', False)) else '',
+             'escape': 'ESCAPE' if bool(element.options.get('escape', False)) else '',
+             'remove_quotes': 'REMOVEQUOTES' if bool(element.options.get('remove_quotes', False)) else ''}
+
     return """
-           COPY %(schema_name)s.%(table_name)s FROM '%(data_location)s'
-           CREDENTIALS 'aws_access_key_id=%(access_key)s;aws_secret_access_key=%(secret_key)s%(session_token)s'
-           CSV
-           TRUNCATECOLUMNS
-           DELIMITER '%(delimiter)s'
-           IGNOREHEADER %(ignore_header)s
-           %(null)s
-           %(gzip)s
-           %(escape)s
-           %(remove_quotes)s
-           %(manifest)s
-           %(empty_as_null)s
-           %(blanks_as_null)s;
+               COPY %(schema_name)s.%(table_name)s FROM '%(data_location)s'
+               CREDENTIALS 'aws_access_key_id=%(access_key)s;aws_secret_access_key=%(secret_key)s%(session_token)s'
+               %(truncatecolumns)s
+               %(empty_as_null)s
+               %(blanks_as_null)s
+               %(datasource_options)s
+               ;
            """ % \
            {'schema_name': element.schema_name,
             'table_name': element.table_name,
@@ -301,15 +324,10 @@ def visit_copy_command(element, compiler, **kw):
             'access_key': element.access_key,
             'secret_key': element.secret_key,
             'session_token': ';token=%s' % element.session_token if element.session_token else '',
-            'null': ("NULL '%s'" % element.options.get('null')) if element.options.get('null') else '',
-            'delimiter': element.options.get('delimiter', ','),
-            'ignore_header': element.options.get('ignore_header', 0),
-            'gzip': 'GZIP' if bool(element.options.get('gzip', False)) else '',
-            'escape': 'ESCAPE' if bool(element.options.get('escape', False)) else '',
-            'remove_quotes': 'REMOVEQUOTES' if bool(element.options.get('remove_quotes', False)) else '',
-            'manifest': 'MANIFEST' if bool(element.options.get('manifest', False)) else '',
+            'truncatecolumns': 'TRUNCATECOLUMNS' if bool(element.options.get('truncate_columns', True)) else '',
             'empty_as_null': 'EMPTYASNULL' if bool(element.options.get('empty_as_null', True)) else '',
-            'blanks_as_null': 'BLANKSASNULL' if bool(element.options.get('blanks_as_null', True)) else ''}
+            'blanks_as_null': 'BLANKSASNULL' if bool(element.options.get('blanks_as_null', True)) else '',
+            'datasource_options': datasource_options}
 
 
 @compiles(BindParameter)
