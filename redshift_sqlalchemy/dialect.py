@@ -4,7 +4,7 @@ from sqlalchemy.dialects.postgresql.psycopg2 import PGDialect_psycopg2
 from sqlalchemy.engine import reflection
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import BindParameter, Executable, ClauseElement
-from sqlalchemy.types import VARCHAR, NullType, BigInteger, Integer
+from sqlalchemy.types import VARCHAR, NullType
 
 
 class RedShiftDDLCompiler(PGDDLCompiler):
@@ -49,6 +49,14 @@ class RedShiftDDLCompiler(PGDDLCompiler):
                       )
 
     '''
+
+    def visit_create_table(self, create, if_not_exists=False):
+        result = super(RedShiftDDLCompiler, self).visit_create_table(create)
+        return result if not if_not_exists else result.replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS")
+
+    def visit_create_schema(self, create, if_not_exists=False):
+        result = super(RedShiftDDLCompiler, self).visit_create_schema(create)
+        return result if not if_not_exists else result.replace("CREATE SCHEMA", "CREATE SCHEMA IF NOT EXISTS")
 
     def post_create_table(self, table):
         text = ""
