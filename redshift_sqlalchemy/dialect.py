@@ -251,7 +251,7 @@ def visit_unload_from_select(element, compiler, **kw):
 class CopyCommand(Executable, ClauseElement):
     ''' Prepares a RedShift COPY statement
     '''
-    def __init__(self, schema_name, table_name, data_location, access_key, secret_key, session_token='', options={}):
+    def __init__(self, schema_name, table_name, data_location, access_key, secret_key, session_token='', options={}, columns_list=[]):
         ''' Initializes a CopyCommand instance
 
         Args:
@@ -263,8 +263,10 @@ class CopyCommand(Executable, ClauseElement):
             access_key    - AWS Access Key (required)
             secret_key    - AWS Secret Key (required)
             session_token - AWS STS Session Token (optional)
+            columns_list  - Optional: the relevant columns of table <table_name>
             options       - Set of optional parameters to modify the COPY sql
                 truncate_columns - Boolean value denoting whether to truncate columns (vs. fail) on overflow; defaults to True
+                quote_character  - Character used for quoting in CSV; defaults to double-quote (")
                 delimiter        - File delimiter; defaults to ','
                 ignore_header    - Integer value of number of lines to skip at the start of each file
                 null             - Optional string value denoting what to interpret as a NULL value from the file
@@ -280,6 +282,7 @@ class CopyCommand(Executable, ClauseElement):
         '''
         self.schema_name = schema_name
         self.table_name = table_name
+        self.columns_list = columns_list
         self.data_location = data_location
         self.access_key = access_key
         self.secret_key = secret_key
@@ -301,7 +304,7 @@ def visit_copy_command(element, compiler, **kw):
     else:
         datasource_options = \
             """
-                CSV
+                CSV '%(quote_character)s'
                 DELIMITER '%(delimiter)s'
                 IGNOREHEADER %(ignore_header)s
                 %(null)s
@@ -309,7 +312,8 @@ def visit_copy_command(element, compiler, **kw):
                 %(escape)s
                 %(remove_quotes)s
             """ % \
-            {'delimiter': element.options.get('delimiter', ','),
+            {'quote_character': element.options.get('quote_character', '"'),
+             'delimiter': element.options.get('delimiter', ','),
              'ignore_header': element.options.get('ignore_header', 0),
              'manifest': 'MANIFEST' if bool(element.options.get('manifest', False)) else '',
              'null': ("NULL '%s'" % element.options.get('null')) if element.options.get('null') else '',
@@ -318,7 +322,8 @@ def visit_copy_command(element, compiler, **kw):
              'remove_quotes': 'REMOVEQUOTES' if bool(element.options.get('remove_quotes', False)) else ''}
 
     return """
-               COPY %(schema_name)s.%(table_name)s FROM '%(data_location)s'
+               COPY %(schema_name)s.%(table_name)s %(columns_string)s
+               FROM '%(data_location)s'
                CREDENTIALS 'aws_access_key_id=%(access_key)s;aws_secret_access_key=%(secret_key)s%(session_token)s'
                %(truncatecolumns)s
                %(empty_as_null)s
@@ -326,7 +331,8 @@ def visit_copy_command(element, compiler, **kw):
                %(datasource_options)s
                ;
            """ % \
-           {'schema_name': element.schema_name,
+           {'columns_string': ('('+ ', '.join(element.columns_list) + ')') if element.columns_list else '',
+            'schema_name': element.schema_name,
             'table_name': element.table_name,
             'data_location': element.data_location,
             'access_key': element.access_key,
