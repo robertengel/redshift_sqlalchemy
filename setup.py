@@ -2,6 +2,7 @@ from setuptools import setup
 from setuptools.command.test import test as TestCommand
 import sys
 
+
 class PyTest(TestCommand):
     def run_tests(self):
         import pytest
@@ -10,7 +11,7 @@ class PyTest(TestCommand):
 
 setup(
     name='redshift-sqlalchemy',
-    version='0.5.5a',
+    version='0.6.0a',
     description='Amazon Redshift Dialect for sqlalchemy',
     long_description=open("README.rst").read(),
     author='Matt George',
