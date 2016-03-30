@@ -265,6 +265,7 @@ class CopyCommand(Executable, ClauseElement):
             session_token - AWS STS Session Token (optional)
             columns_list  - Optional: the relevant columns of table <table_name>
             options       - Set of optional parameters to modify the COPY sql
+                json             - Boolean value denoting whether source data is in json format (does not apply to DynamoDB data sources)
                 truncate_columns - Boolean value denoting whether to truncate columns (vs. fail) on overflow; defaults to True
                 quote_character  - Character used for quoting in CSV; defaults to double-quote (")
                 delimiter        - File delimiter; defaults to ','
@@ -295,6 +296,8 @@ def visit_copy_command(element, compiler, **kw):
     ''' Returns the actual sql query for the CopyCommand class
     '''
 
+    json = bool(element.options.get("json", False))
+
     if element.data_location.startswith('dynamodb://'):
         datasource_options = \
             """
@@ -302,24 +305,30 @@ def visit_copy_command(element, compiler, **kw):
             """ % \
             {'readratio':  element.options.get('readratio', 175)}
     else:
-        datasource_options = \
-            """
-                CSV '%(quote_character)s'
-                DELIMITER '%(delimiter)s'
-                IGNOREHEADER %(ignore_header)s
-                %(null)s
-                %(gzip)s
-                %(escape)s
-                %(remove_quotes)s
-            """ % \
-            {'quote_character': element.options.get('quote_character', '"'),
-             'delimiter': element.options.get('delimiter', ','),
-             'ignore_header': element.options.get('ignore_header', 0),
-             'manifest': 'MANIFEST' if bool(element.options.get('manifest', False)) else '',
-             'null': ("NULL '%s'" % element.options.get('null')) if element.options.get('null') else '',
-             'gzip': 'GZIP' if bool(element.options.get('gzip', False)) else '',
-             'escape': 'ESCAPE' if bool(element.options.get('escape', False)) else '',
-             'remove_quotes': 'REMOVEQUOTES' if bool(element.options.get('remove_quotes', False)) else ''}
+        if json:
+            datasource_options = \
+                """
+                    JSON 'auto'
+                """
+        else:
+            datasource_options = \
+                """
+                    CSV '%(quote_character)s'
+                    DELIMITER '%(delimiter)s'
+                    IGNOREHEADER %(ignore_header)s
+                    %(null)s
+                    %(gzip)s
+                    %(escape)s
+                    %(remove_quotes)s
+                """ % \
+                {'quote_character': element.options.get('quote_character', '"'),
+                 'delimiter': element.options.get('delimiter', ','),
+                 'ignore_header': element.options.get('ignore_header', 0),
+                 'manifest': 'MANIFEST' if bool(element.options.get('manifest', False)) else '',
+                 'null': ("NULL '%s'" % element.options.get('null')) if element.options.get('null') else '',
+                 'gzip': 'GZIP' if bool(element.options.get('gzip', False)) else '',
+                 'escape': 'ESCAPE' if bool(element.options.get('escape', False)) else '',
+                 'remove_quotes': 'REMOVEQUOTES' if bool(element.options.get('remove_quotes', False)) else ''}
 
     return """
                COPY %(schema_name)s.%(table_name)s %(columns_string)s
@@ -338,9 +347,9 @@ def visit_copy_command(element, compiler, **kw):
             'access_key': element.access_key,
             'secret_key': element.secret_key,
             'session_token': ';token=%s' % element.session_token if element.session_token else '',
-            'truncatecolumns': 'TRUNCATECOLUMNS' if bool(element.options.get('truncate_columns', True)) else '',
-            'empty_as_null': 'EMPTYASNULL' if bool(element.options.get('empty_as_null', True)) else '',
-            'blanks_as_null': 'BLANKSASNULL' if bool(element.options.get('blanks_as_null', True)) else '',
+            'truncatecolumns': 'TRUNCATECOLUMNS' if bool(element.options.get('truncate_columns', True)) and not json else '',
+            'empty_as_null': 'EMPTYASNULL' if bool(element.options.get('empty_as_null', True)) and not json else '',
+            'blanks_as_null': 'BLANKSASNULL' if bool(element.options.get('blanks_as_null', True)) and not json else '',
             'datasource_options': datasource_options}
 
 
