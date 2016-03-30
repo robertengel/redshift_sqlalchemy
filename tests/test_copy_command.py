@@ -33,6 +33,17 @@ class TestCopyCommand(TestCase):
 
         self.assertEqual(expected_result, copy_str)
 
+    def test_json_copy(self):
+        expected_result = re.sub(r'\s+', ' ',
+                                  "COPY schema1.t1 FROM 's3://mybucket/data/listing/' "
+                                  "CREDENTIALS 'aws_access_key_id=cookies;aws_secret_access_key=cookies' "
+                                  "JSON 'auto' ;").strip()
+        copy = CopyCommand('schema1', 't1', 's3://mybucket/data/listing/', 'cookies', 'cookies', options={'json': True})
+
+        copy_str = re.sub(r'\s+', ' ', str(copy)).strip()
+
+        self.assertEqual(expected_result, copy_str)
+
     def test_copy_with_columns_list(self):
         expected_result = re.sub(r'\s+', ' ',
                                   "COPY schema1.t1 (abc, def) FROM 's3://mybucket/data/listing/' "
