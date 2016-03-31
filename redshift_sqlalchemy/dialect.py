@@ -313,7 +313,7 @@ def visit_copy_command(element, compiler, **kw):
         else:
             datasource_options = \
                 """
-                    CSV '%(quote_character)s'
+                    CSV QUOTE AS '%(quote_character)s'
                     DELIMITER '%(delimiter)s'
                     IGNOREHEADER %(ignore_header)s
                     %(null)s

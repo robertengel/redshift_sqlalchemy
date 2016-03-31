@@ -15,7 +15,7 @@ class TestCopyCommand(TestCase):
         expected_result = re.sub(r'\s+', ' ',
                                   "COPY schema1.t1 FROM 's3://mybucket/data/listing/' "
                                   "CREDENTIALS 'aws_access_key_id=cookies;aws_secret_access_key=cookies' "
-                                  "TRUNCATECOLUMNS EMPTYASNULL BLANKSASNULL CSV '\"' DELIMITER ',' IGNOREHEADER 0 ;").strip()
+                                  "TRUNCATECOLUMNS EMPTYASNULL BLANKSASNULL CSV QUOTE AS '\"' DELIMITER ',' IGNOREHEADER 0 ;").strip()
         copy = CopyCommand('schema1', 't1', 's3://mybucket/data/listing/', 'cookies', 'cookies')
 
         copy_str = re.sub(r'\s+', ' ', str(copy)).strip()
@@ -48,7 +48,7 @@ class TestCopyCommand(TestCase):
         expected_result = re.sub(r'\s+', ' ',
                                   "COPY schema1.t1 (abc, def) FROM 's3://mybucket/data/listing/' "
                                   "CREDENTIALS 'aws_access_key_id=cookies;aws_secret_access_key=cookies' "
-                                  "TRUNCATECOLUMNS EMPTYASNULL BLANKSASNULL CSV '\"' DELIMITER ',' IGNOREHEADER 0 ;").strip()
+                                  "TRUNCATECOLUMNS EMPTYASNULL BLANKSASNULL CSV QUOTE AS '\"' DELIMITER ',' IGNOREHEADER 0 ;").strip()
         copy = CopyCommand('schema1', 't1', 's3://mybucket/data/listing/', 'cookies', 'cookies', columns_list=['abc', 'def'])
 
         copy_str = re.sub(r'\s+', ' ', str(copy)).strip()
